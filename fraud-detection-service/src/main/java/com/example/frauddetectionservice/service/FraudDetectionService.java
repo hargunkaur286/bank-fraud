@@ -3,7 +3,10 @@ package com.example.frauddetectionservice.service;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +23,12 @@ public class FraudDetectionService {
 
     private final AccountServiceClient accountServiceClient;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    private final RedisTemplate<String, String> redisTemplate;
+
+    @Value ("${fraud.max-transactions-per-minute}")
+    private int maxTransactionsPerMinute;
+
     private static final String VERIFICATION_REQUIRED_TOPIC = "verification.required";
     private static final String FRAUD_CHECK_CLEAN_RESULT_TOPIC = "fraud.clean.check";
 
@@ -57,5 +66,47 @@ public class FraudDetectionService {
 
             kafkaTemplate.send(FRAUD_CHECK_CLEAN_RESULT_TOPIC, transactionId, transactionCleanEvent);
         }
+    }
+
+    private FraudCheckResult performFraudChecks(
+        String accountNumber,
+        BigDecimal amount,
+        BigDecimal senderBalance
+    ){
+        // Pattern 1: Velocity Check
+        if(isVeloctyExceeded(accountNumber)){
+            return new FraudCheckResult(
+                true, "Too many transactions in 60 seconds" + " - Velocity limit exceeded"
+            );
+        }
+
+        // Pattern 2: Amount Check
+        if(isAmountSuspicious(accountNumber, amount)){
+            return new FraudCheckResult(
+                true, "Unusual transaction amount" + " - exceeds 3x your average"
+            );
+        }
+
+        // Pattern 3: Balance Check
+        if(senderBalance.compareTo(BigDecimal.ZERO) > 0
+            && isBalanceCheckFailed(senderBalance, amount)){
+                return new FraudCheckResult(
+                    true, "Transaction exceed 90% of account balance"
+                );
+            }
+
+            return new FraudCheckResult(false, null);
+    }
+
+
+    private boolean isVeloctyExceeded(String accountNumber){
+        String key = "fraud:velocity" + accountNumber;
+        Long count = redisTemplate.opsForValue().increment(key);
+
+        if(count != null && count == 1){
+            redisTemplate.expire(key, 60, TimeUnit.SECONDS);
+        }
+
+        log.info("Velocity check - account: {} count: {}/{}", accountNumber, count)
     }
 }
