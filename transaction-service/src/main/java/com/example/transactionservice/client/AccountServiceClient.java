@@ -16,4 +16,12 @@ public class AccountServiceClient {
     ) {
         return null;
     }
+
+    @PutMapping("/api/v1/accounts/{accountNumber}/credit")
+    String creditBalance(
+        @PathVariable String accountNumber,
+        @RequestParam BigDecimal amount
+    ){
+        return null;
+    }
 }
