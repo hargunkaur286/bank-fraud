@@ -16,8 +16,8 @@ spring:
             filters:
               - name: RequestRateLimiter
                 args:
-                  redis-rate-limiter-replinishRate: 10
-                  redis-rate-limiter-burstCapacity: 20
+                  redis-rate-limiter.replinishRate: 10
+                  redis-rate-limiter.burstCapacity: 20
           #Transaction service routes
           - id: transaction-service
             uri: http://localhost:8082
@@ -26,8 +26,8 @@ spring:
             filters:
               - name: RequestRateLimiter
                 args:
-                  redis-rate-limiter-replinishRate: 10
-                  redis-rate-limiter-burstCapacity: 20
+                  redis-rate-limiter.replinishRate: 10
+                  redis-rate-limiter.burstCapacity: 20
           #Payment service routes
           - id: payment-service
             uri: http://localhost:8082
@@ -36,8 +36,8 @@ spring:
             filters:
               - name: RequestRateLimiter
                 args:
-                  redis-rate-limiter-replinishRate: 10
-                  redis-rate-limiter-burstCapacity: 10
+                  redis-rate-limiter.replinishRate: 10
+                  redis-rate-limiter.burstCapacity: 10
 server:
   port: 8080
 management:

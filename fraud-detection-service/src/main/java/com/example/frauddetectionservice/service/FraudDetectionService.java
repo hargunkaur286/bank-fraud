@@ -2,12 +2,11 @@ package com.example.frauddetectionservice.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -38,7 +37,7 @@ public class FraudDetectionService {
     private double maxBalancePercentage;
 
     private static final String VERIFICATION_REQUIRED_TOPIC = "verification.required";
-    private static final String FRAUD_CHECK_CLEAN_RESULT_TOPIC = "fraud.clean.check";
+    private static final String FRAUD_CHECK_CLEAN_RESULT_TOPIC = "fraud.check.clean";
 
     public void checkTransaction(Map<String, Object> payload){
         String transactionId = (String)payload.get("transactionId");
@@ -112,7 +111,7 @@ public class FraudDetectionService {
         Long count = redisTemplate.opsForValue().increment(key);
 
         if(count != null && count == 1){
-            redisTemplate.expire(key, 60, TimeUnit.SECONDS);
+            redisTemplate.expire(key, Duration.ofSeconds(60));
         }
 
         log.info("Velocity check - account: {} count: {}/{}", accountNumber, count, maxTransactionsPerMinute);

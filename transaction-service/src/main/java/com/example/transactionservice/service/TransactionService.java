@@ -9,10 +9,9 @@ import java.util.stream.Collectors;
 
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.TransactionStatus;
-
+import com.example.transactionservice.entity.TransactionStatus;
 import com.example.transactionservice.client.AccountServiceClient;
-import com.example.transactionservice.config.RedisConfig;
+// import com.example.transactionservice.config.RedisConfig;
 import com.example.transactionservice.dto.TransactionResponse;
 import com.example.transactionservice.dto.TransferRequest;
 import com.example.transactionservice.entity.Transaction;
@@ -20,7 +19,7 @@ import com.example.transactionservice.entity.TransactionType;
 import com.example.transactionservice.event.TransactionCompletedEvent;
 import com.example.transactionservice.event.TransactionInitiatedEvent;
 import com.example.transactionservice.repository.TransactionRepository;
-
+import org.springframework.data.redis.core.RedisTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -34,7 +33,7 @@ public class TransactionService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final RedisTemplate<String, String> redisTemplate;
 
-    private static final String TRANSACTION_INTIATED_TOPIC = "transaction.initiated";
+    private static final String TRANSACTION_INITIATED_TOPIC = "transaction.initiated";
     private static final String TRANSACTION_COMPLETED_TOPIC = "transaction.completed";
     private static final String TRANSACTION_REFUNDED_TOPIC = "transaction.refunded";
     private static final String FRAUD_DETECTED_TOPIC = "fraud.detected";
@@ -64,7 +63,6 @@ public class TransactionService {
         transaction.setSenderAccountNumber(request.getSenderAccountNumber());
         transaction.setReceiverAccountNumber(request.getReceiverAccountNumber());
         transaction.setAmount(request.getAmount());
-        transaction.setAmount(request.getAmount());
         transaction.setType(TransactionType.TRANSFER);
         transaction.setStatus(TransactionStatus.PROCESSING);
         transaction.setDescription(request.getDescription());
@@ -82,7 +80,7 @@ public class TransactionService {
             savedTransaction.getDescription()
         );
 
-        kafkaTemplate.send(TRANSACTION_INTIATED_TOPIC, savedTransaction.getId(), event);
+        kafkaTemplate.send(TRANSACTION_INITIATED_TOPIC, savedTransaction.getId(), event);
         log.info("SAGA STEP 2 - TransactionInitiatedEvent published: {}", savedTransaction.getId());
 
         return mapToResponse(savedTransaction);
@@ -111,7 +109,7 @@ public class TransactionService {
             "Transaction not found " + transactionID
         ));
 
-        String otpKey = "verification:otp" + transactionID;
+        String otpKey = "verification:otp:" + transactionID;
         String storedOtp = redisTemplate.opsForValue().get(otpKey);
 
         if(storedOtp == null){

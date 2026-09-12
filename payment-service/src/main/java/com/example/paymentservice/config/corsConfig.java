@@ -11,7 +11,7 @@ public class corsConfig {
     public WebMvcConfigurer corsConfigurer(){
         return new WebMvcConfigurer() {
             @Override 
-            public void addCorsMapping(CorsRegistry registry){
+            public void addCorsMappings(CorsRegistry registry){
                 registry.addMapping("/api/**")
                     .allowedHeaders("*")
                     .allowedMethods("GET", "POST", "PUT", "DELETE")
