@@ -18,7 +18,7 @@ spring:
       hibernate:
         dialect: org.hiberate.dialect.MySQLDialect
   kafka:
-    bootstrap-servers: localhost:9902
+    bootstrap-servers: localhost:9092
     consumer: 
       group-id: account-service-group
       auto-offset-reset: earliest
