@@ -16,7 +16,7 @@ import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
+import jakarta.persistence.GenerationType;
 @Entity 
 @Table (name="payments")
 @Data 
@@ -39,7 +39,7 @@ public class Payment {
     @Column (nullable = false)
     private String currency;
 
-    @Enumerated (EnumType.STRING);
+    @Enumerated (EnumType.STRING)
     private PaymentStatus status;
 
     private String description;

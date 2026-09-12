@@ -2,13 +2,16 @@ package com.example.paymentservice.controller;
 
 import java.util.Map;
 
-import org.apache.catalina.connector.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.example.paymentservice.dto.CreatePaymentRequest;
+import com.example.paymentservice.service.PaymentService;
+import com.razorpay.RazorpayException;
 
 import com.example.paymentservice.dto.PaymentOrderResponse;
 
@@ -26,7 +29,7 @@ public class PaymentController {
     @PostMapping ("/create-order")
     public ResponseEntity<PaymentOrderResponse> createPaymentOrder(
         @Valid @RequestBody CreatePaymentRequest request) throws RazorpayException{
-            return Response.status(HttpStatus.CREATED)
+            return ResponseEntity.status(HttpStatus.CREATED)
                     .body(paymentService.createPaymentOrder(request));
         }
         // Razorpay webhook endpoint
