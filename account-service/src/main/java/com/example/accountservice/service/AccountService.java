@@ -3,8 +3,6 @@ package com.example.accountservice.service;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 
-import javax.management.RuntimeErrorException;
-
 import org.springframework.stereotype.Service;
 
 import com.example.accountservice.dto.AccountResponse;

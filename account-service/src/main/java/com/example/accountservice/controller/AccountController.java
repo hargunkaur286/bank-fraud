@@ -2,7 +2,7 @@ package com.example.accountservice.controller;
 
 import java.math.BigDecimal;
 
-import org.springframework.http.HttpStatusCode;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
+import org.springframework.web.bind.annotation.RequestParam;
 import com.example.accountservice.dto.AccountResponse;
 import com.example.accountservice.dto.CreateAccountRequest;
 import com.example.accountservice.service.AccountService;
@@ -43,7 +43,7 @@ public class AccountController {
     }
 
     @GetMapping ("/{accountNumber}/balance")
-    public ResponseEntity<AccountResponse> getBalance(
+    public ResponseEntity<BigDecimal> getBalance(
         @PathVariable String accountNumber
     ){
         return ResponseEntity.ok(accountService.getBalance(accountNumber));

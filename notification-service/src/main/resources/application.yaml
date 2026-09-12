@@ -3,7 +3,7 @@ spring:
     name: notification-service
   kafka:
     bootstrap-servers: localhost:9092
-    consumer: 
+    consumer:
       group-id: account-service-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -20,8 +20,8 @@ spring:
               default:
                 type: java.util.HashMap
     producer:
-      key-serializer: org.apache.kafka.common.serialization.StrinSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer 
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 server:
   port: 8085
 management:

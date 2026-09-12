@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -19,7 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Service 
 @Slf4j 
-@RequiredArgsConstructor
+@RequiredArgsConstructor 
 public class FraudDetectionService {
 
     private final AccountServiceClient accountServiceClient;
@@ -137,12 +138,10 @@ public class FraudDetectionService {
         BigDecimal nextAvg = avgAmount.add(amount)
             .divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
 
-        redisTemplate.opsForValue().set(avgKey, newAvg.toString());
+    redisTemplate.opsForValue().set(avgKey, nextAvg.toString());        log.info("Amount check - amount: {} threshold: {} suspicious: {}", amount, threshold, amount.compareTo(threshold) > 0);
 
-        log.info("Amount check - amount: {} threshold: {} suspicious: {}", amount, threshold, amount.compareTo(threshold) > 0);
-
-        return amount.compareTo(threshold)>0;
-    }
+            return amount.compareTo(threshold)>0;
+        }
 
     private boolean isBalanceCheckFailed(BigDecimal senderBalance, BigDecimal amount){
         BigDecimal maxAllowed = senderBalance.multiply(
