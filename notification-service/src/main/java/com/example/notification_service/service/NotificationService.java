@@ -6,7 +6,6 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
-import io.micrometer.observation.annotation.ObservationKeyValue;
 import lombok.extern.slf4j.Slf4j;
 
 @Service 
@@ -25,11 +24,20 @@ public class NotificationService {
             String reason = (String) payload.get("reason");
 
             sendAlert(
-                "TRANSACTION VERIFICATION REQUIRED", 
-                String.format(
-                    "Suspicious activity detected on your account. " + "Reason: %s " + "A transaction of %s is pending verification. " + "Your OTP is: %s. Valid for 5 minutes. " + "If this was"
-                )
+            accountNumber,
+            "TRANSACTION VERIFICATION REQUIRED",
+            String.format(
+                "Suspicious activity detected on your account. " +
+                "Reason: %s. " +
+                "A transaction of %s is pending verification. " +
+                "Your OTP is: %s. Valid for 5 minutes. " +
+                "Transaction ID: %s.",
+                reason,
+                amount,
+                otp,
+                transactionId
             )
+        );
         }
         catch(Exception e){
             log.error("Error sending OTP notification: {}", e.getMessage());
@@ -57,7 +65,7 @@ public class NotificationService {
 
         }
         catch(Exception e){
-            log.error("Error sending transaction notification: {}, e.getMessage()");
+            log.error("Error sending transaction notification: {}", e.getMessage());
         }
     }
 
@@ -100,7 +108,15 @@ public class NotificationService {
             String accountNumber = (String) payload.get("accountNumber");
             String amount = payload.get("amount").toString();
 
-            sendAlert(accountNumber, "PAYMENT SUCCESSFUL", String.format("Payment of %s completed", "Razorpay ID: %s", amount, payload.get("razorpayPaymentId")));
+            sendAlert(
+                accountNumber,
+                "PAYMENT SUCCESSFUL",
+                String.format(
+                    "Payment of %s completed. Razorpay ID: %s",
+                    amount,
+                    payload.get("razorpayPaymentId")
+                )
+            );
         }
         catch(Exception e){
             log.error("Error sending payment notification: {}", e.getMessage());

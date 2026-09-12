@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import org.apache.catalina.servlets.DefaultServlet.SortManager.Order;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -15,7 +14,10 @@ import com.example.paymentservice.dto.PaymentOrderResponse;
 import com.example.paymentservice.entity.Payment;
 import com.example.paymentservice.entity.PaymentStatus;
 import com.example.paymentservice.repository.PaymentRepository;
-
+import com.razorpay.RazorpayClient;
+import com.razorpay.RazorpayException;
+import com.razorpay.Order;
+import org.json.JSONObject;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -48,40 +50,65 @@ public class PaymentService {
      * @return
      */
 
-    public PaymentOrderResponse createPaymentOrder(CreatePaymentRequest request) throws RazorpayException {
-        log.info("Creating payment order for account: {} amount: {}", request.getAccountNumber(), request.getAmount());
+    public PaymentOrderResponse createPaymentOrder(
+        CreatePaymentRequest request
+    ) throws RazorpayException {
 
-        RazorpayClient razorpayClient = new RazorpayClient();
+        log.info(
+            "Creating payment order for account: {} amount: {}",
+            request.getAccountNumber(),
+            request.getAmount()
+        );
 
-        // Converted Amount
+        RazorpayClient razorpayClient =
+            new RazorpayClient(keyId, keySecret);
+
         int convertedAmount = request.getAmount()
             .multiply(BigDecimal.valueOf(100))
             .intValue();
-        
+
         JSONObject orderRequest = new JSONObject();
+
         orderRequest.put("amount", convertedAmount);
-        orderRequest.put("currency", "USD/INR");
-        orderRequest.put("receipt", "rcpt_" + System.currentTimeMillis() + UUID.randomUUID().toString().replace("-", "").substring(0, 10));
+        orderRequest.put("currency", "INR");
+        orderRequest.put(
+            "receipt",
+            "rcpt_"
+                + System.currentTimeMillis()
+                + UUID.randomUUID()
+                    .toString()
+                    .replace("-", "")
+                    .substring(0, 10)
+        );
 
-        Order razorpayOrder = razorpayClient.orders.create(orderRequest);
-        log.info("Razorpay order created: {}", razorpayOrder.get("id").toString);
+        Order razorpayOrder =
+            razorpayClient.orders.create(orderRequest);
 
-        // Save the payment record
+        String razorpayOrderId =
+            razorpayOrder.get("id").toString();
+
+        log.info(
+            "Razorpay order created: {}",
+            razorpayOrderId
+        );
+
         Payment payment = new Payment();
-        payment.setRazorpayOrderId(razorpayOrder.get("id").toString);
+
+        payment.setRazorpayOrderId(razorpayOrderId);
         payment.setAccountNumber(request.getAccountNumber());
         payment.setAmount(request.getAmount());
-        payment.setCurrency("USD/INR");
+        payment.setCurrency("INR");
         payment.setStatus(PaymentStatus.CREATED);
         payment.setDescription(request.getDescription());
 
-        Payment savedPayment = paymentRepository.save(payment);
+        Payment savedPayment =
+            paymentRepository.save(payment);
 
         return new PaymentOrderResponse(
             savedPayment.getId(),
-            razorpayOrder.get("id").toString(),
+            razorpayOrderId,
             request.getAmount(),
-            "USD/INR",
+            "INR",
             "created",
             keyId
         );
@@ -139,7 +166,7 @@ public class PaymentService {
                     .orElseThrow(() -> new RuntimeException(
                         "Payment not found for order"
                     ));
-            payment.setStaus(PaymentStatus.FAILED);
+            payment.setStatus(PaymentStatus.FAILED);
             payment.setFailureReason("Payment failed via Razorpay");
             paymentRepository.save(payment);
 
@@ -159,9 +186,17 @@ public class PaymentService {
         }
     }
 
-    private Map<String, Object> extractPaymentDate(Map<String, Object> payload){
-        Map<String, Object> entity = (Map<String, Object>) payload.get("payload");
-        Map<String, Object> paymentWrapper = (Map<String, Object>) entity.get("payment");
-        return (Map<String, Object>) paymentWrapper.get("entity");
-    }
+    @SuppressWarnings("unchecked")
+        private Map<String, Object> extractPaymentData(
+            Map<String, Object> payload
+        ) {
+            Map<String, Object> entity =
+                (Map<String, Object>) payload.get("payload");
+
+            Map<String, Object> paymentWrapper =
+                (Map<String, Object>) entity.get("payment");
+
+            return (Map<String, Object>)
+                paymentWrapper.get("entity");
+        }
 }   
