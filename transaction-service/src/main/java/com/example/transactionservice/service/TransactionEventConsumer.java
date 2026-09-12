@@ -1,18 +1,17 @@
 package com.example.transactionservice.service;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.TransactionStatus;
-
+import com.example.transactionservice.entity.TransactionStatus;
 import com.example.transactionservice.entity.Transaction;
 import com.example.transactionservice.repository.TransactionRepository;
-
+import org.springframework.data.redis.core.RedisTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -56,8 +55,12 @@ public class TransactionEventConsumer {
             String otp = String.format("%06d", (int) (Math.random() * 900000) + 100000);
 
             // Store OTP in Redis - expires in 5 minutes
-            String otpKey = "verification:otp" + transactionId;
-            redisTemplate.opsForValue().set(otpKey, otp, OTP_EXPIRY_MINUTES, TimeUnit.MINUTES); 
+            String otpKey = "verification:otp:" + transactionId;
+            redisTemplate.opsForValue().set(
+                otpKey,
+                otp,
+                Duration.ofMinutes(OTP_EXPIRY_MINUTES)
+            );
 
             // Update Status 
             transaction.setStatus(TransactionStatus.PENDING_VERIFICATION);
@@ -76,7 +79,7 @@ public class TransactionEventConsumer {
             kafkaTemplate.send(TRANSACTION_OTP_GENERATED_TOPIC, transactionId, otpEvent);
         }
         catch(Exception e){
-            log.info("Error handling verification required: {}, e.getMessage()");
+            log.info("Error handling verification required: {}", e.getMessage());
         }
     }
 

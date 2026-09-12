@@ -26,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor 
 public class TransactionController {
     private final TransactionService transactionService;
+    @PostMapping 
 
     public ResponseEntity<TransactionResponse> transfer(
         @Valid @RequestBody TransferRequest request
@@ -34,7 +35,7 @@ public class TransactionController {
                 .body(transactionService.transfer(request));
     }
 
-    @GetMapping ("{/transactionId}")
+    @GetMapping ("/{transactionId}")
     public ResponseEntity<TransactionResponse> getTransaction(
         @PathVariable String transactionId
     ){
@@ -55,7 +56,7 @@ public class TransactionController {
     ){
         log.info("OTP verification request - transaction: {}", transactionId);
 
-        return ResponseEntity.ok(transactionService.verifyOTP(transactionId, otp));
+        return ResponseEntity.ok(transactionService.verifyOtp(transactionId, otp));
     }
 
 
