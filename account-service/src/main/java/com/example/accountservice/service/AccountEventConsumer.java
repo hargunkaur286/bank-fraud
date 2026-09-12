@@ -7,14 +7,15 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service 
 @Slf4j 
-
+@RequiredArgsConstructor
 public class AccountEventConsumer {
     private final AccountService accountService;
-    @KafkaListener(topics = "transaction.completed");
+    @KafkaListener(topics = "transaction.completed")
     // consume transaction completed event from kafka
     // credits receiver account
     public void consumeTransactionCompleted(
@@ -33,7 +34,7 @@ public class AccountEventConsumer {
 
 
     // consume fraud.detected event from kafka and blocks the flagged account
-    @KafkaListener (topics = "fraud.detected");
+    @KafkaListener (topics = "fraud.detected")
     public void comsumeFraudDetected(@Payload Map<String, Object> payload){
         try{
             String accountNumber = (String) payload.get("accountNumber");

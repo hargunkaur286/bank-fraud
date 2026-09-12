@@ -7,6 +7,9 @@ import java.time.LocalDateTime;
 import com.example.accountservice.entity.AccountStatus;
 import com.example.accountservice.entity.AccountType;
 
+import lombok.Data;
+@Data 
+
 public class AccountResponse {
 
     private String id;

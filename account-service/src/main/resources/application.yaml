@@ -6,7 +6,7 @@ spring:
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa: 
+  jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
@@ -15,7 +15,7 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
   kafka:
     bootstrap-servers: localhost:9092
-    consumer: 
+    consumer:
       group-id: account-service-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -32,8 +32,8 @@ spring:
               default:
                 type: java.util.HashMap
     producer:
-      key-serializer: org.apache.kafka.common.serialization.StrinSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer 
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 server:
   port: 8081
 management:
@@ -41,4 +41,3 @@ management:
     web:
       exposure:
         include: health, info
-
