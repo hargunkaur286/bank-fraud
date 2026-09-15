@@ -1,0 +1,21 @@
+#fraud-detection-service/dockerfile
+# mvn clean package -DskipTests -> command to make jar file -> fraud-detection-service-0.0.1-SNAPSHOT.jar (ls target to view the file)
+
+# docker image command -> docker build -t fraud-detection-service:latest .
+
+# command to run docker file -> docker run -p 8084:8084 --network bank-fraud_banking-network fraud-detection-service:latest
+
+# Step 1: Use Java 17 as the base image
+FROM eclipse-temurin:17-jre
+
+# Step 2: Set working directory inside the container
+WORKDIR /app
+
+# Step 3: Copy the built jar file
+COPY target/fraud-detection-service-0.0.1-SNAPSHOT.jar app.jar
+
+# Step 4: Expose port
+Expose 8084
+
+# Step 5: Run the jar
+ENTRYPOINT ["java", "-jar", "app.jar"]

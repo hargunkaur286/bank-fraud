@@ -1,0 +1,21 @@
+#transaction-service/dockerfile
+# mvn clean package -DskipTest -> command to make jar file -> transaction-service-0.0.1-SNAPSHOT.jar
+
+# docker image command -> docker build -t transaction-service:latest .
+
+# command to run docker file -> docker run -p 8082:8082 --network bank-fraud_banking-network transaction-service:latest
+
+# Step 1: Use Java 17 as the base image
+FROM eclipse-temurin:17-jre
+
+# Step 2: Set working directory inside the container
+WORKDIR /app
+
+# Step 3: Copy the built jar file
+COPY target/transaction-service-0.0.1-SNAPSHOT.jar app.jar
+
+# Step 4: Expose port
+Expose 8082
+
+# Step 5: Run the jar
+ENTRYPOINT ["java", "-jar", "app.jar"]

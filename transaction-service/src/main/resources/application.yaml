@@ -3,10 +3,10 @@ spring:
     name: transaction-service
   data:
     redis:
-      host: localhost
+      host: redis
       port: 6379
   datasource:
-    url: jdbc:mysql://localhost:3307/transaction_db?createDatabaseIfNotExist=true
+    url: jdbc:mysql://host.docker.internal:3307/transaction_db?createDatabaseIfNotExist=true
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -18,7 +18,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: kafka:29092
     consumer:
       group-id: transaction-service-group
       auto-offset-reset: earliest
@@ -42,7 +42,7 @@ server:
   port: 8082
 account:
   service:
-    url: http://localhost:8081
+    url: http://account-service:8081
 management:
   endpoints:
     web:
