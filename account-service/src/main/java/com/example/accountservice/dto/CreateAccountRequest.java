@@ -34,6 +34,4 @@ public class CreateAccountRequest {
     @Positive(message = "Initial deposit must be positive")
     private BigDecimal initialDeposit;
 
-
-
 }

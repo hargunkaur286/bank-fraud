@@ -22,31 +22,70 @@ public class AccountService {
     private final AccountRepository accountRepository;
     private static SecureRandom secureRandom = new SecureRandom();
 
+    // public AccountResponse createAccount(CreateAccountRequest request){
+    //     log.info("Creating account for: {}", request.getEmail());
+
+    //     if(accountRepository.existsByEmail(request.getEmail())){
+    //         throw new RuntimeException("Account already exists for email: "+ request.getEmail());
+    //     }
+
+    //     Account account = new Account();
+    //     account.setAccountHolderName(request.getAccountHolderName());
+    //     account.setEmail(request.getEmail());
+    //     account.setPhone(request.getPhone());
+    //     account.setAccountType(request.getAccountType());
+    //     account.setStatus(AccountStatus.ACTIVE);
+    //     account.setBalance(request.getInitialDeposit());
+    //     account.setAccountNumber(generateAccountNumber());
+    //     account.setDailyTransactionLimit(
+    //         request.getAccountType() == AccountType.SAVINGS
+    //         ? new BigDecimal("1000000")
+    //         : new BigDecimal("5000000")
+    //     );
+
+    //     Account savedAccount = accountRepository.save(account);
+    //     log.info("Account created: {}", savedAccount.getAccountNumber());
+    //     return mapToResponse(savedAccount);
+    // }
+
     public AccountResponse createAccount(CreateAccountRequest request){
-        log.info("Creating account for: {}", request.getEmail());
+    log.info("Creating account for: {}", request.getEmail());
 
-        if(accountRepository.existsByEmail(request.getEmail())){
-            throw new RuntimeException("Account already exists for email: "+ request.getEmail());
-        }
+    log.info("Checking existing email...");
+    if(accountRepository.existsByEmail(request.getEmail())){
+        throw new RuntimeException(
+            "Account already exists for email: " + request.getEmail()
+        );
+    }
 
-        Account account = new Account();
-        account.setAccountHolderName(request.getAccountHolderName());
-        account.setEmail(request.getEmail());
-        account.setPhone(request.getPhone());
-        account.setAccountType(request.getAccountType());
-        account.setStatus(AccountStatus.ACTIVE);
-        account.setBalance(request.getInitialDeposit());
-        account.setAccountNumber(generateAccountNumber());
-        account.setDailyTransactionLimit(
-            request.getAccountType() == AccountType.SAVINGS
+    log.info("Email check passed");
+
+    Account account = new Account();
+    account.setAccountHolderName(request.getAccountHolderName());
+    account.setEmail(request.getEmail());
+    account.setPhone(request.getPhone());
+    account.setAccountType(request.getAccountType());
+    account.setStatus(AccountStatus.ACTIVE);
+    account.setBalance(request.getInitialDeposit());
+
+    log.info("Generating account number...");
+    account.setAccountNumber(generateAccountNumber());
+    log.info("Generated account number: {}", account.getAccountNumber());
+
+    account.setDailyTransactionLimit(
+        request.getAccountType() == AccountType.SAVINGS
             ? new BigDecimal("1000000")
             : new BigDecimal("5000000")
-        );
+    );
 
-        Account savedAccount = accountRepository.save(account);
-        log.info("Account created: {}", savedAccount.getAccountNumber());
-        return mapToResponse(savedAccount);
-    }
+    log.info("About to save account: {}", account);
+
+    Account savedAccount = accountRepository.save(account);
+
+    log.info("Account saved successfully: {}", savedAccount.getAccountNumber());
+
+    return mapToResponse(savedAccount);
+}
 
     //get account by account number
     public AccountResponse getAccount(String accountNumber){
@@ -101,8 +140,7 @@ public class AccountService {
         log.info("Crediting {} to account: {}", amount, accountNumber);
 
         Account account = accountRepository.findByAccountNumber(accountNumber)
-        .orElseThrow(() -> new RuntimeException("Account Not Found"));
-        account.setStatus(AccountStatus.BLOCKED);
+            .orElseThrow(() -> new RuntimeException("Account Not Found"));
 
         account.setBalance(account.getBalance().add(amount));
         accountRepository.save(account);
@@ -115,12 +153,13 @@ public class AccountService {
         String accountNumber;
 
         do {
-            long number = secureRandom.nextLong(1_000_000_000L);
+            long number = 100_000_000_000L
+                    + secureRandom.nextLong(900_000_000_000L);
 
-            accountNumber = String.format("%012", number);
-        } while (accountRepository
-            .existsByAccountNumber(accountNumber)
-        );
+            accountNumber = String.format("%012d", number);
+
+        } while (accountRepository.existsByAccountNumber(accountNumber));
+
         return accountNumber;
     }
 

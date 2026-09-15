@@ -34,8 +34,7 @@ public class NotificationService {
                 "Transaction ID: %s.",
                 reason,
                 amount,
-                otp,
-                transactionId
+                otp
             )
         );
         }

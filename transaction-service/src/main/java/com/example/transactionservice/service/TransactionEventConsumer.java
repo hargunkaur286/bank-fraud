@@ -79,7 +79,7 @@ public class TransactionEventConsumer {
             kafkaTemplate.send(TRANSACTION_OTP_GENERATED_TOPIC, transactionId, otpEvent);
         }
         catch(Exception e){
-            log.info("Error handling verification required: {}", e.getMessage());
+            log.info("Error handling verification required: {}", e);
         }
     }
 
@@ -92,7 +92,7 @@ public class TransactionEventConsumer {
             transactionService.processCleanResult(transactionId);
         }
         catch (Exception e){
-            log.error("Error processing fraud check result: {}", e.getMessage());
+            log.error("Error processing fraud check result: {}", e);
         }
     }
 }

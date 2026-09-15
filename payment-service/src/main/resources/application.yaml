@@ -22,8 +22,9 @@ server:
   port: 8083
 #Razorpay configuration
 razorpay:
-  key-id: rzp_xxxxxx
-  key-secret:
+  key:
+    id: REDACTED_RAZORPAY_KEY_ID
+    secret: REDACTED_RAZORPAY_KEY_SECRET
   webhook-secret:
 management:
   endpoints:

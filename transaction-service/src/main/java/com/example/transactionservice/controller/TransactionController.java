@@ -26,7 +26,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor 
 public class TransactionController {
     private final TransactionService transactionService;
-    @PostMapping 
+    @PostMapping("/transfer")
+
 
     public ResponseEntity<TransactionResponse> transfer(
         @Valid @RequestBody TransferRequest request
