@@ -34,6 +34,10 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:demo-only-jwt-signing-secret-change-me-before-any-real-deployment-1234567890}
+    expiration-ms: 86400000
 server:
   port: 8081
 management:

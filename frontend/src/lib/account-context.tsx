@@ -8,22 +8,28 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getAccount } from "@/lib/api/accounts";
+import { getAccount, login as loginRequest } from "@/lib/api/accounts";
 import type { AccountResponse, ApiError } from "@/lib/api";
 import {
-  clearActiveAccountNumber,
-  getActiveAccountNumber,
-  setActiveAccountNumber,
-} from "@/lib/known-accounts";
+  clearSession,
+  getSession,
+  rememberRecentLogin,
+  setSession,
+} from "@/lib/session";
 
 interface AccountContextValue {
   account: AccountResponse | null;
+  /** null when signed in via the legacy "account number only" path - no
+   *  password was ever set for that account, so no session token exists and
+   *  token-gated actions (blocking the account) are unavailable. */
+  token: string | null;
   isLoading: boolean;
   error: ApiError | null;
   /** true once the initial localStorage/lookup cycle has finished */
   isReady: boolean;
   refresh: () => Promise<void>;
-  switchAccount: (accountNumber: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  continueWithAccountNumber: (accountNumber: string) => Promise<void>;
   signOut: () => void;
 }
 
@@ -31,11 +37,12 @@ const AccountContext = createContext<AccountContextValue | null>(null);
 
 export function AccountProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<AccountResponse | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [isReady, setIsReady] = useState(false);
 
-  const load = useCallback(async (accountNumber: string) => {
+  const loadAccount = useCallback(async (accountNumber: string) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -51,39 +58,64 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     function run() {
-      const stored = getActiveAccountNumber();
-      if (stored) {
-        load(stored).finally(() => setIsReady(true));
+      const session = getSession();
+      if (session) {
+        setToken(session.token);
+        loadAccount(session.accountNumber).finally(() => setIsReady(true));
       } else {
         setIsReady(true);
       }
     }
     run();
-  }, [load]);
+  }, [loadAccount]);
 
   const refresh = useCallback(async () => {
     if (account) {
-      await load(account.accountNumber);
+      await loadAccount(account.accountNumber);
     }
-  }, [account, load]);
+  }, [account, loadAccount]);
 
-  const switchAccount = useCallback(
-    async (accountNumber: string) => {
-      setActiveAccountNumber(accountNumber);
-      await load(accountNumber);
-    },
-    [load],
-  );
+  const login = useCallback(async (email: string, password: string) => {
+    const response = await loginRequest({ email, password });
+    setSession({ accountNumber: response.account.accountNumber, token: response.token });
+    rememberRecentLogin({
+      accountNumber: response.account.accountNumber,
+      email: response.account.email,
+      accountHolderName: response.account.accountHolderName,
+    });
+    setToken(response.token);
+    setAccount(response.account);
+    setError(null);
+  }, []);
+
+  const continueWithAccountNumber = useCallback(async (accountNumber: string) => {
+    const data = await getAccount(accountNumber);
+    setSession({ accountNumber: data.accountNumber, token: null });
+    setToken(null);
+    setAccount(data);
+    setError(null);
+  }, []);
 
   const signOut = useCallback(() => {
-    clearActiveAccountNumber();
+    clearSession();
     setAccount(null);
+    setToken(null);
     setError(null);
   }, []);
 
   return (
     <AccountContext.Provider
-      value={{ account, isLoading, error, isReady, refresh, switchAccount, signOut }}
+      value={{
+        account,
+        token,
+        isLoading,
+        error,
+        isReady,
+        refresh,
+        login,
+        continueWithAccountNumber,
+        signOut,
+      }}
     >
       {children}
     </AccountContext.Provider>

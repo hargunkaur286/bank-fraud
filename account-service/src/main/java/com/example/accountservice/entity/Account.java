@@ -40,6 +40,12 @@ public class Account {
     @Column(nullable = false)
     private String phone;
 
+    // BCrypt hash, never the raw password. Nullable because accounts created
+    // before login existed have no password - they can still be looked up by
+    // account number, but cannot log in via email/password until reset.
+    @Column
+    private String password;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AccountType accountType;

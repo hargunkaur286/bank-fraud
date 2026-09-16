@@ -26,6 +26,17 @@ export interface CreateAccountRequest {
   phone: string;
   accountType: AccountType;
   initialDeposit: number;
+  password: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  account: AccountResponse;
 }
 
 export type TransactionType = "DEPOSIT" | "WITHDRAWAL" | "PAYMENT" | "TRANSFER";

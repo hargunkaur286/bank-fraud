@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoginForm } from "./login-form";
 import { EnterAccountForm } from "./enter-account-form";
 import { CreateAccountForm } from "./create-account-form";
 import { useActiveAccount } from "@/lib/account-context";
@@ -22,11 +23,8 @@ export function OnboardingScreen() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Access your account</CardTitle>
-            <CardDescription>
-              This app has no separate login - it identifies you by account
-              number, the same way the banking API does.
-            </CardDescription>
+            <CardTitle>Welcome back</CardTitle>
+            <CardDescription>Log in, or create a new account.</CardDescription>
           </CardHeader>
           <CardContent>
             {error ? (
@@ -34,16 +32,24 @@ export function OnboardingScreen() {
                 {error.message}
               </p>
             ) : null}
-            <Tabs defaultValue="existing">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="existing">Existing account</TabsTrigger>
+            <Tabs defaultValue="login">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="login">Log in</TabsTrigger>
                 <TabsTrigger value="new">Create account</TabsTrigger>
+                <TabsTrigger value="legacy">Account number</TabsTrigger>
               </TabsList>
-              <TabsContent value="existing" className="pt-4">
-                <EnterAccountForm />
+              <TabsContent value="login" className="pt-4">
+                <LoginForm />
               </TabsContent>
               <TabsContent value="new" className="pt-4">
                 <CreateAccountForm />
+              </TabsContent>
+              <TabsContent value="legacy" className="pt-4 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  For accounts created before login existed - these have no
+                  password on file, so this skips authentication entirely.
+                </p>
+                <EnterAccountForm />
               </TabsContent>
             </Tabs>
           </CardContent>

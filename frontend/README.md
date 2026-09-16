@@ -16,11 +16,12 @@ Open http://localhost:3000. `NEXT_PUBLIC_API_BASE_URL` in `.env.local`
 points at the deployed gateway (`http://34.228.56.9:8080` by default — see
 `.env.example`).
 
-There is no login screen. The backend has no authentication and no "list my
-accounts" endpoint, so this app identifies you purely by account number, the
-same way the API does — enter an existing one or create a new one on first
-visit. `src/lib/known-accounts.ts` explains the reasoning; it's a browser
-convenience, not a session.
+Log in with email + password, or create an account (also sets a password
+now). Accounts created before this feature existed have no password on file
+and keep working through a third "account number" tab with no auth at all —
+see the Real authentication section below. **This requires a backend change
+that isn't deployed yet** — see Deploying below before you try logging in
+against the live server.
 
 ## Why calls go through `/api/v1/...` instead of the gateway directly
 
@@ -62,6 +63,60 @@ transaction id) come back as a bare **500**, not 404/409/422. `errors.ts`
 and the per-call fallback messages in `accounts.ts`/`transactions.ts` are
 keyed accordingly — this was verified against the live deployment, not
 guessed from the code.
+
+## Real authentication (account-service)
+
+Login is genuine, not decorative: `account-service` now stores a BCrypt
+hash on the `Account` entity, `POST /accounts/login` verifies it and issues
+an HMAC-signed JWT (`TokenService`, 24h expiry), and
+`PUT /accounts/{accountNumber}/block` requires that token and checks it
+matches the account being blocked - tested locally by attempting to block
+one account with another account's token and confirming a 401.
+
+What it deliberately does **not** cover:
+
+- **`GET /accounts/{accountNumber}` stays public.** Send Money looks up the
+  recipient's name before you confirm a transfer, the same way most banking
+  apps resolve an account holder's name from an account number alone without
+  the recipient being logged in. Locking this down would break that.
+- **transaction-service and payment-service don't check this token at all.**
+  They're separate Spring Boot apps with their own unauthenticated
+  endpoints. This means `POST /transactions/transfer` still accepts any
+  `senderAccountNumber` from anyone who knows it - logging in does not yet
+  protect money movement, only the one account-service action (block) that
+  was in scope for this change. Extending the token check to those services
+  is a reasonable next step, not done here.
+- **Accounts created before this shipped have `password = NULL`.** They
+  still work via the old "enter account number" tab (unauthenticated, same
+  trust model as before this change - not a new hole). There's no
+  "set a password retroactively" endpoint, so the only way to get a real
+  login is creating a new account.
+
+## Deploying this change
+
+`account-service`'s Dockerfile packages a pre-built jar, and the deployed
+stack pulls images from ECR (see `../docker-compose.yml`) - editing the
+Java source here does **not** change what's running on `34.228.56.9` until
+someone rebuilds and pushes that image and restarts the stack. That needs
+AWS/SSH credentials this assistant doesn't have, so to actually go live:
+
+```bash
+cd account-service
+./mvnw clean package -DskipTests
+docker build -t 885427126350.dkr.ecr.us-east-1.amazonaws.com/account-service:latest .
+docker push 885427126350.dkr.ecr.us-east-1.amazonaws.com/account-service:latest
+
+ssh ubuntu@34.228.56.9
+docker compose pull account-service
+docker compose up -d account-service
+```
+
+Set a real `APP_JWT_SECRET` (long random string) in `docker-compose.yml`'s
+`account-service` environment block before doing this for anything beyond a
+demo - the checked-in value is a placeholder. Hibernate's `ddl-auto: update`
+will add the new nullable `password` column automatically on first boot
+against the existing database; it won't touch or invalidate any accounts
+already there.
 
 ## The transaction lifecycle
 

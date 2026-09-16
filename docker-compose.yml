@@ -84,6 +84,7 @@ account-service:
     SPRING_DATASOURCE_USERNAME: root
     SPRING_DATASOURCE_PASSWORD: root
     SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    APP_JWT_SECRET: change-this-to-a-long-random-secret-before-real-use-1234567890abcdef
   depends_on:
     - mysql
     - kafka

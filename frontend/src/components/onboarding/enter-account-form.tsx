@@ -15,7 +15,7 @@ const schema = z.object({ accountNumber: accountNumberSchema });
 type Values = z.infer<typeof schema>;
 
 export function EnterAccountForm() {
-  const { switchAccount } = useActiveAccount();
+  const { continueWithAccountNumber } = useActiveAccount();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -26,7 +26,7 @@ export function EnterAccountForm() {
   const onSubmit = async (values: Values) => {
     setServerError(null);
     try {
-      await switchAccount(values.accountNumber);
+      await continueWithAccountNumber(values.accountNumber);
     } catch {
       setServerError(
         "We couldn't find an account with that number. Double-check it and try again.",

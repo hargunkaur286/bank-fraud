@@ -7,6 +7,10 @@ export const accountNumberSchema = z
   .max(32, "Enter a valid account number")
   .regex(/^[0-9]+$/, "Account numbers contain digits only");
 
+export const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters");
+
 export const createAccountSchema = z.object({
   accountHolderName: z.string().trim().min(2, "Enter the account holder's full name"),
   email: z.string().trim().email("Enter a valid email address"),
@@ -19,9 +23,21 @@ export const createAccountSchema = z.object({
   initialDeposit: z.coerce
     .number()
     .positive("Opening deposit must be greater than zero"),
+  password: passwordSchema,
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 export type CreateAccountFormValues = z.infer<typeof createAccountSchema>;
+
+export const loginSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address"),
+  password: z.string().min(1, "Enter your password"),
+});
+
+export type LoginFormValues = z.infer<typeof loginSchema>;
 
 export const transferSchema = z.object({
   senderAccountNumber: z.string(),

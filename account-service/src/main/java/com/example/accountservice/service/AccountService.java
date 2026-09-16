@@ -3,23 +3,29 @@ package com.example.accountservice.service;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.example.accountservice.dto.AccountResponse;
 import com.example.accountservice.dto.CreateAccountRequest;
+import com.example.accountservice.dto.LoginRequest;
+import com.example.accountservice.dto.LoginResponse;
 import com.example.accountservice.entity.Account;
 import com.example.accountservice.entity.AccountStatus;
 import com.example.accountservice.entity.AccountType;
+import com.example.accountservice.exception.UnauthorizedException;
 import com.example.accountservice.repository.AccountRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-@Service 
-@Slf4j 
-@RequiredArgsConstructor 
+@Service
+@Slf4j
+@RequiredArgsConstructor
 public class AccountService {
     private final AccountRepository accountRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final TokenService tokenService;
     private static SecureRandom secureRandom = new SecureRandom();
 
     // public AccountResponse createAccount(CreateAccountRequest request){
@@ -67,6 +73,7 @@ public class AccountService {
     account.setAccountType(request.getAccountType());
     account.setStatus(AccountStatus.ACTIVE);
     account.setBalance(request.getInitialDeposit());
+    account.setPassword(passwordEncoder.encode(request.getPassword()));
 
     log.info("Generating account number...");
     account.setAccountNumber(generateAccountNumber());
@@ -86,6 +93,24 @@ public class AccountService {
 
     return mapToResponse(savedAccount);
 }
+
+    public LoginResponse login(LoginRequest request) {
+        Account account = accountRepository.findByEmail(request.getEmail())
+            .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
+
+        if (account.getPassword() == null) {
+            throw new UnauthorizedException(
+                "This account predates login and has no password set. Create a new account, or ask an admin to set one."
+            );
+        }
+
+        if (!passwordEncoder.matches(request.getPassword(), account.getPassword())) {
+            throw new UnauthorizedException("Invalid email or password");
+        }
+
+        String token = tokenService.generateToken(account.getAccountNumber());
+        return new LoginResponse(token, mapToResponse(account));
+    }
 
     //get account by account number
     public AccountResponse getAccount(String accountNumber){

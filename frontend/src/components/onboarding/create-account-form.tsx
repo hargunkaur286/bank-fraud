@@ -20,7 +20,7 @@ import type { ApiError } from "@/lib/api";
 import { createAccountSchema, type CreateAccountFormValues } from "@/lib/validation";
 
 export function CreateAccountForm() {
-  const { switchAccount } = useActiveAccount();
+  const { login } = useActiveAccount();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -35,8 +35,10 @@ export function CreateAccountForm() {
   const onSubmit = async (values: CreateAccountFormValues) => {
     setServerError(null);
     try {
-      const created = await createAccount(values);
-      await switchAccount(created.accountNumber);
+      await createAccount(values);
+      // account-service's create-account response has no token - log in
+      // right after with the same credentials to start a real session.
+      await login(values.email, values.password);
     } catch (err) {
       setServerError((err as ApiError).message);
     }
@@ -65,6 +67,28 @@ export function CreateAccountForm() {
           <Input id="phone" {...register("phone")} />
           {errors.phone ? (
             <p className="text-xs text-destructive">{errors.phone.message}</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="password">Password</Label>
+          <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
+          {errors.password ? (
+            <p className="text-xs text-destructive">{errors.password.message}</p>
+          ) : null}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword">Confirm password</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            {...register("confirmPassword")}
+          />
+          {errors.confirmPassword ? (
+            <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
           ) : null}
         </div>
       </div>

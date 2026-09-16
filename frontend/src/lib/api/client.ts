@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getSession } from "@/lib/session";
 
 /**
  * All requests go to same-origin "/api/v1/...". next.config.ts rewrites
@@ -13,4 +14,18 @@ export const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+});
+
+/**
+ * Attaches the session token when one exists. Only account-service's
+ * PUT /accounts/{accountNumber}/block currently checks it - every other
+ * endpoint just ignores the header - but attaching it globally means new
+ * protected endpoints work without touching call sites.
+ */
+apiClient.interceptors.request.use((config) => {
+  const session = getSession();
+  if (session?.token) {
+    config.headers.set("Authorization", `Bearer ${session.token}`);
+  }
+  return config;
 });

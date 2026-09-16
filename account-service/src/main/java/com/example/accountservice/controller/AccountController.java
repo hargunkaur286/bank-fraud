@@ -1,38 +1,54 @@
 package com.example.accountservice.controller;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestParam;
 import com.example.accountservice.dto.AccountResponse;
 import com.example.accountservice.dto.CreateAccountRequest;
+import com.example.accountservice.dto.LoginRequest;
+import com.example.accountservice.dto.LoginResponse;
+import com.example.accountservice.exception.UnauthorizedException;
 import com.example.accountservice.service.AccountService;
+import com.example.accountservice.service.TokenService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-@RestController 
+@RestController
 @RequestMapping("/api/v1/accounts")
-@Slf4j 
-@RequiredArgsConstructor 
+@Slf4j
+@RequiredArgsConstructor
 public class AccountController {
     private final AccountService accountService;
+    private final TokenService tokenService;
 
-    @PostMapping 
+    @PostMapping
     public ResponseEntity<AccountResponse> createAccount(
         @Valid @RequestBody CreateAccountRequest request
     ){
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(accountService.createAccount(request));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(
+        @Valid @RequestBody LoginRequest request
+    ){
+        return ResponseEntity.ok(accountService.login(request));
     }
 
     @GetMapping("{accountNumber}")
@@ -49,12 +65,28 @@ public class AccountController {
         return ResponseEntity.ok(accountService.getBalance(accountNumber));
     }
 
+    // Requires the caller to hold a valid session token for THIS account -
+    // the one thing in this controller that actually checks who is asking.
+    // getAccount() above stays open on purpose: recipient lookup during a
+    // transfer needs to work without the recipient being logged in, the same
+    // way most banking APIs let you resolve an account holder's name from an
+    // account number alone.
     @PutMapping("/{accountNumber}/block")
     public ResponseEntity<String> blockAccount(
-        @PathVariable String accountNumber
+        @PathVariable String accountNumber,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ){
+        String tokenAccountNumber = tokenService.requireAccountNumber(authorization);
+        if (!tokenAccountNumber.equals(accountNumber)) {
+            throw new UnauthorizedException("You can only block your own account.");
+        }
         accountService.blockAccount(accountNumber);
         return ResponseEntity.ok("Account blocked Successfully");
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, String>> handleUnauthorized(UnauthorizedException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", ex.getMessage()));
     }
 
     // STEP 1: DEDUCT BALANCE

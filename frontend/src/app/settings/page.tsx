@@ -21,7 +21,7 @@ import type { ApiError } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 export default function SettingsPage() {
-  const { account, refresh, signOut } = useActiveAccount();
+  const { account, token, refresh, signOut } = useActiveAccount();
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
   const [blockError, setBlockError] = useState<ApiError | null>(null);
@@ -76,21 +76,22 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>This browser</CardTitle>
+          <CardTitle>This session</CardTitle>
           <CardDescription>
-            There&apos;s no login on the backend - this browser just
-            remembers the account number you&apos;re using.
+            {token
+              ? "You're signed in with email and password."
+              : "You're using legacy account-number access - this account has no password on file."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium">Switch or add accounts</p>
+            <p className="text-sm font-medium">Session details</p>
             <p className="text-xs text-muted-foreground">
-              Manage every account number known to this browser.
+              View the account and session type for this browser.
             </p>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link href="/accounts">Manage accounts</Link>
+            <Link href="/accounts">View</Link>
           </Button>
         </CardContent>
         <Separator />
@@ -117,18 +118,24 @@ export default function SettingsPage() {
           <div>
             <p className="text-sm font-medium">Block this account</p>
             <p className="text-xs text-muted-foreground">
-              Prevents any future transfers from this account.
+              {token
+                ? "Prevents any future transfers from this account."
+                : "Requires a password-authenticated session - log in with email and password to do this."}
             </p>
           </div>
           <Button
             variant="outline"
             size="sm"
             className="border-destructive/30 text-destructive hover:bg-destructive/5"
-            disabled={account.status !== "ACTIVE"}
+            disabled={account.status !== "ACTIVE" || !token}
             onClick={() => setBlockDialogOpen(true)}
           >
             <ShieldOff className="size-3.5" />
-            {account.status === "ACTIVE" ? "Block account" : `Already ${account.status.toLowerCase()}`}
+            {account.status !== "ACTIVE"
+              ? `Already ${account.status.toLowerCase()}`
+              : !token
+                ? "Log in required"
+                : "Block account"}
           </Button>
         </CardContent>
       </Card>
