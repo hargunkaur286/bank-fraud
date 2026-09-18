@@ -13,6 +13,7 @@ import com.example.paymentservice.dto.CreatePaymentRequest;
 import com.example.paymentservice.dto.PaymentOrderResponse;
 import com.example.paymentservice.entity.Payment;
 import com.example.paymentservice.entity.PaymentStatus;
+import com.example.paymentservice.exception.NotFoundException;
 import com.example.paymentservice.repository.PaymentRepository;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
@@ -134,10 +135,20 @@ public class PaymentService {
             String paymentId = (String) paymentData.get("id");
 
             Payment payment = paymentRepository.findByRazorpayOrderId(orderId)
-                    .orElseThrow(() -> new RuntimeException(
+                    .orElseThrow(() -> new NotFoundException(
                         "Payment not found for order"
                     ));
-            
+
+            // Razorpay retries webhooks that don't get a fast 200 response,
+            // so the same "payment.captured" event can arrive more than
+            // once. Unlike account-service's credit path, there's no
+            // separate ledger needed here - the Payment row's own status is
+            // the idempotency check.
+            if (payment.getStatus() == PaymentStatus.COMPLETED) {
+                log.info("Payment {} already COMPLETED - ignoring duplicate webhook", payment.getId());
+                return;
+            }
+
             payment.setRazorpayPaymentId(paymentId);
             payment.setStatus(PaymentStatus.COMPLETED);
             paymentRepository.save(payment);
@@ -163,9 +174,15 @@ public class PaymentService {
             String orderId = (String) paymentData.get("order_id");
 
             Payment payment = paymentRepository.findByRazorpayOrderId(orderId)
-                    .orElseThrow(() -> new RuntimeException(
+                    .orElseThrow(() -> new NotFoundException(
                         "Payment not found for order"
                     ));
+
+            if (payment.getStatus() == PaymentStatus.FAILED) {
+                log.info("Payment {} already FAILED - ignoring duplicate webhook", payment.getId());
+                return;
+            }
+
             payment.setStatus(PaymentStatus.FAILED);
             payment.setFailureReason("Payment failed via Razorpay");
             paymentRepository.save(payment);
