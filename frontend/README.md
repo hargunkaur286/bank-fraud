@@ -64,14 +64,25 @@ and the per-call fallback messages in `accounts.ts`/`transactions.ts` are
 keyed accordingly — this was verified against the live deployment, not
 guessed from the code.
 
-## Real authentication (account-service)
+## Real authentication (account-service + transaction-service)
 
-Login is genuine, not decorative: `account-service` now stores a BCrypt
-hash on the `Account` entity, `POST /accounts/login` verifies it and issues
-an HMAC-signed JWT (`TokenService`, 24h expiry), and
-`PUT /accounts/{accountNumber}/block` requires that token and checks it
-matches the account being blocked - tested locally by attempting to block
-one account with another account's token and confirming a 401.
+Login is genuine, not decorative: `account-service` stores a BCrypt hash on
+the `Account` entity, `POST /accounts/login` verifies it and issues an
+HMAC-signed JWT (`TokenService`, 24h expiry, subject = account number).
+
+That token is now actually enforced where it matters for moving money, not
+just for the one endpoint it started on:
+
+- `PUT /accounts/{accountNumber}/block` (account-service) - must be your own account.
+- `POST /transactions/transfer` (transaction-service) - the token's account
+  must match `senderAccountNumber`, or the request never reaches the SAGA at all.
+- `POST /transactions/{id}/verify` (transaction-service) - the token's
+  account must match the transaction's sender before an OTP is even checked.
+
+transaction-service verifies with the same shared secret account-service
+signs with (`APP_JWT_SECRET`, both services) rather than calling
+account-service on every request - it never issues tokens itself, only checks
+them.
 
 What it deliberately does **not** cover:
 
@@ -79,44 +90,54 @@ What it deliberately does **not** cover:
   recipient's name before you confirm a transfer, the same way most banking
   apps resolve an account holder's name from an account number alone without
   the recipient being logged in. Locking this down would break that.
-- **transaction-service and payment-service don't check this token at all.**
-  They're separate Spring Boot apps with their own unauthenticated
-  endpoints. This means `POST /transactions/transfer` still accepts any
-  `senderAccountNumber` from anyone who knows it - logging in does not yet
-  protect money movement, only the one account-service action (block) that
-  was in scope for this change. Extending the token check to those services
-  is a reasonable next step, not done here.
+- **payment-service doesn't check this token.** `create-order` takes money
+  *in* via Razorpay rather than moving it out of an account, so it was lower
+  priority than transfer/verify - extending the check there is the natural
+  next step if this goes further.
 - **Accounts created before this shipped have `password = NULL`.** They
-  still work via the old "enter account number" tab (unauthenticated, same
-  trust model as before this change - not a new hole). There's no
-  "set a password retroactively" endpoint, so the only way to get a real
-  login is creating a new account.
+  still work via the old "enter account number" tab for read-only/legacy
+  access (same trust model as before this change - not a new hole), but
+  can't call any of the endpoints above, since there's no token to present.
+  There's no "set a password retroactively" endpoint, so the only way to get
+  a real login is creating a new account.
 
 ## Deploying this change
 
-`account-service`'s Dockerfile packages a pre-built jar, and the deployed
-stack pulls images from ECR (see `../docker-compose.yml`) - editing the
-Java source here does **not** change what's running on `34.228.56.9` until
-someone rebuilds and pushes that image and restarts the stack. That needs
-AWS/SSH credentials this assistant doesn't have, so to actually go live:
+Every backend Dockerfile packages a pre-built jar, and the deployed stack
+pulls images from ECR (see `../docker-compose.yml`) - editing Java source
+locally does **not** change what's running on `34.228.56.9` until someone
+rebuilds and pushes the image(s) and restarts the stack. That needs AWS/SSH
+credentials this assistant doesn't have, so to actually go live, **five
+services changed** and need this treatment: `account-service`,
+`transaction-service`, `payment-service`, `notification-service` (Twilio),
+and `fraud-detection-service` (test infra only - no runtime code changed
+there).
 
 ```bash
-cd account-service
+# repeat for account-service, transaction-service, payment-service,
+# notification-service
+cd <service>
 ./mvnw clean package -DskipTests
-docker build -t 885427126350.dkr.ecr.us-east-1.amazonaws.com/account-service:latest .
-docker push 885427126350.dkr.ecr.us-east-1.amazonaws.com/account-service:latest
+docker build -t 885427126350.dkr.ecr.us-east-1.amazonaws.com/<service>:latest .
+docker push 885427126350.dkr.ecr.us-east-1.amazonaws.com/<service>:latest
 
 ssh ubuntu@34.228.56.9
-docker compose pull account-service
-docker compose up -d account-service
+docker compose pull
+docker compose up -d
 ```
 
-Set a real `APP_JWT_SECRET` (long random string) in `docker-compose.yml`'s
-`account-service` environment block before doing this for anything beyond a
-demo - the checked-in value is a placeholder. Hibernate's `ddl-auto: update`
-will add the new nullable `password` column automatically on first boot
-against the existing database; it won't touch or invalidate any accounts
-already there.
+First, copy `.env.example` (repo root) to `.env` next to `docker-compose.yml`
+and fill in real values - **`APP_JWT_SECRET` must be identical** between
+account-service and transaction-service (one signs, the other only
+verifies), and `docker compose` won't start those two at all without it set
+(see the `:?` requirement in `docker-compose.yml`). Twilio's three variables
+are optional - see `.env.example` for exactly where to get them and what
+happens if you leave them blank.
+
+Hibernate's `ddl-auto: update` adds the new nullable `password` column (and
+account-service's `processed_events` idempotency table) automatically on
+first boot against the existing database; neither touches or invalidates
+data already there.
 
 ## The transaction lifecycle
 
@@ -128,6 +149,65 @@ returns almost immediately with `status: "PROCESSING"`.
 `/transactions/[id]/verify` (the OTP screen); a wrong or expired OTP doesn't
 error — the backend answers 200 with `status: "FLAGGED"` and refunds the
 sender, which the UI just renders as a security warning.
+
+## Idempotency (Kafka redelivers; two bugs came from that)
+
+Kafka is at-least-once delivery, not exactly-once - the same event can be
+redelivered after a consumer restart or rebalance. Two places didn't handle
+that, and both are now fixed:
+
+- **account-service double-crediting.** A redelivered `transaction.completed`
+  used to credit the receiver twice. `AccountEventConsumer` now claims a row
+  in a new `processed_events` table (`IdempotencyService.claim(...)`,
+  relying on a DB unique constraint, not a check-then-act read) before
+  crediting - a repeat delivery is a no-op.
+- **transaction-service double-refunding.** Retrying `verify` on an
+  already-resolved transaction used to re-run the "OTP expired" branch and
+  refund the sender a second time. `verifyOtp` now short-circuits and just
+  returns the existing result once the transaction has left
+  `PENDING_VERIFICATION`.
+
+A third, unrelated bug surfaced while fixing the first one: nothing in the
+system ever consumed `payment.completed` - a successful Razorpay top-up
+updated the `Payment` row in payment-service but never actually credited the
+account. account-service now has a listener for it (same idempotency
+pattern, keyed by payment id).
+
+## Tests
+
+- `account-service` / `transaction-service` / `payment-service`: fast
+  Mockito-based unit tests over the service layer (30 tests total across all
+  five backend services) - login, password hashing, the SAGA's compensating
+  paths, and both idempotency fixes above are covered directly.
+- `TransactionSagaIntegrationTest` (transaction-service): a
+  Testcontainers-backed test that boots the real Spring context against a
+  real MySQL and a real Kafka broker, publishes a `fraud.check.clean` event
+  the way fraud-detection-service actually would, and asserts the
+  transaction reaches `COMPLETED` through the real Kafka listener - not
+  mocked.
+- Every service's default `contextLoads()` test now also runs against
+  Testcontainers-provided MySQL/Kafka/Redis instead of the `mysql:3307` /
+  `kafka:29092` hostnames in `application.yaml`, which don't resolve outside
+  docker-compose's own network. As originally written, these tests could
+  only ever pass with the full docker-compose stack already running locally
+  - they'd fail in CI, or on a fresh clone, every time.
+- Requires Docker locally to run the Testcontainers-based tests (`docker
+  info` should succeed) - CI runners have it by default.
+
+## CI
+
+`.github/workflows/backend-ci.yml` runs `mvn verify` for all five backend
+services on every push/PR (matrix job, one per service - Testcontainers
+tests run for real since GitHub's runners ship Docker already).
+`.github/workflows/frontend-ci.yml` lints, type-checks, and builds this
+directory the same way.
+
+## API docs
+
+`account-service`, `transaction-service`, and `payment-service` each expose
+Swagger UI at `/swagger-ui/index.html` and raw OpenAPI JSON at
+`/v3/api-docs` once running (via `springdoc-openapi`) - useful for exploring
+the real request/response shapes without reading Java DTOs.
 
 ## Testing the OTP flow (a real gap, not a frontend bug)
 
