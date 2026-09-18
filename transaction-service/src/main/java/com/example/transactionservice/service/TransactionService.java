@@ -18,6 +18,8 @@ import com.example.transactionservice.entity.Transaction;
 import com.example.transactionservice.entity.TransactionType;
 import com.example.transactionservice.event.TransactionCompletedEvent;
 import com.example.transactionservice.event.TransactionInitiatedEvent;
+import com.example.transactionservice.exception.NotFoundException;
+import com.example.transactionservice.exception.UnauthorizedException;
 import com.example.transactionservice.repository.TransactionRepository;
 import org.springframework.data.redis.core.RedisTemplate;
 import lombok.RequiredArgsConstructor;
@@ -89,7 +91,7 @@ public class TransactionService {
     public TransactionResponse getTransaction(String transactionId){
         return mapToResponse(transactionRepository
             .findById(transactionId)
-            .orElseThrow(() -> new RuntimeException(
+            .orElseThrow(() -> new NotFoundException(
                 "Transaction not found: "+ transactionId
             )));
     }
@@ -102,12 +104,27 @@ public class TransactionService {
         .collect(Collectors.toList());
     }
 
-    public TransactionResponse verifyOtp(String transactionID, String otp){
+    public TransactionResponse verifyOtp(String transactionID, String otp, String callerAccountNumber){
         log.info("OTP Verification for the transaction: {}", transactionID);
 
-        Transaction transaction = transactionRepository.findById(transactionID).orElseThrow(() -> new RuntimeException(
+        Transaction transaction = transactionRepository.findById(transactionID).orElseThrow(() -> new NotFoundException(
             "Transaction not found " + transactionID
         ));
+
+        if (!transaction.getSenderAccountNumber().equals(callerAccountNumber)) {
+            throw new UnauthorizedException("You can only verify a transaction you sent.");
+        }
+
+        // Idempotency guard: without this, a retried or double-submitted
+        // verify request on a transaction that's already been resolved
+        // would re-run the OTP-expired branch (the Redis key is deleted on
+        // the first call either way) and refund the sender a second time.
+        // Once we've left PENDING_VERIFICATION, verification is done - just
+        // report the outcome instead of acting again.
+        if (transaction.getStatus() != TransactionStatus.PENDING_VERIFICATION) {
+            log.info("Transaction {} already resolved (status={}) - returning existing result", transactionID, transaction.getStatus());
+            return mapToResponse(transaction);
+        }
 
         String otpKey = "verification:otp:" + transactionID;
         String storedOtp = redisTemplate.opsForValue().get(otpKey);
@@ -197,7 +214,7 @@ public class TransactionService {
     }
 
     public void processCleanResult(String transactionID){
-        Transaction transaction = transactionRepository.findById(transactionID).orElseThrow(() -> new RuntimeException(
+        Transaction transaction = transactionRepository.findById(transactionID).orElseThrow(() -> new NotFoundException(
             "Transaction not found " + transactionID
         ));
 

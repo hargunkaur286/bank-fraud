@@ -43,6 +43,12 @@ server:
 account:
   service:
     url: http://account-service:8081
+# Must be the exact same value as account-service's app.jwt.secret - this
+# service only verifies tokens, it never issues them, so it has to trust
+# signatures made with the same key account-service signed them with.
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:demo-only-jwt-signing-secret-change-me-before-any-real-deployment-1234567890}
 management:
   endpoints:
     web:
