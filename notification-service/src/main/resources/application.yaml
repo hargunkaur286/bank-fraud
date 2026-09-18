@@ -24,6 +24,20 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 server:
   port: 8085
+# Used to look up a phone number by account number before sending the OTP SMS.
+account:
+  service:
+    url: http://account-service:8081
+# Twilio - all optional. If any of these are blank, OTPs are only logged
+# (the previous behavior), never sent as a real SMS. See the root README
+# for exactly where to get these values and where to set them.
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  from-number: ${TWILIO_FROM_NUMBER:}
+notification:
+  sms:
+    default-country-code: ${SMS_DEFAULT_COUNTRY_CODE:+91}
 management:
   endpoints:
     web:

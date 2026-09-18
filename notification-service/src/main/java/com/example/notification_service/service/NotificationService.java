@@ -6,11 +6,16 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-@Service 
-@Slf4j 
+@Service
+@Slf4j
+@RequiredArgsConstructor
 public class NotificationService {
+
+    private final TwilioSmsSender smsSender;
+    private final AccountLookupClient accountLookupClient;
 
     @KafkaListener(topics = "transaction.otp.generated")
     public void consumeOtpGenerated(
@@ -34,9 +39,23 @@ public class NotificationService {
                 "Transaction ID: %s.",
                 reason,
                 amount,
-                otp
+                otp,
+                transactionId
             )
         );
+
+            // The OTP is the one alert a user actually has to act on to
+            // finish a flagged transfer, so it's the only one that also
+            // goes out as a real SMS (when Twilio is configured).
+            if (smsSender.isConfigured()) {
+                accountLookupClient.findPhoneNumber(accountNumber).ifPresentOrElse(
+                    phone -> smsSender.send(
+                        phone,
+                        String.format("Your Coverstone verification code is %s. Valid for 5 minutes.", otp)
+                    ),
+                    () -> log.warn("No phone number on file for account {} - OTP was only logged", accountNumber)
+                );
+            }
         }
         catch(Exception e){
             log.error("Error sending OTP notification: {}", e.getMessage());
