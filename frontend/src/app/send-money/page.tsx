@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, LogIn } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { useActiveAccount } from "@/lib/account-context";
 import { TransferForm } from "@/components/transfer/transfer-form";
 import { TransferConfirm } from "@/components/transfer/transfer-confirm";
@@ -15,7 +17,7 @@ import type { TransferFormValues } from "@/lib/validation";
 type Step = "form" | "confirm" | "processing";
 
 export default function SendMoneyPage() {
-  const { account, refresh } = useActiveAccount();
+  const { account, token, refresh } = useActiveAccount();
   const [step, setStep] = useState<Step>("form");
   const [values, setValues] = useState<TransferFormValues | null>(null);
   const [recipient, setRecipient] = useState<AccountResponse | null>(null);
@@ -33,6 +35,31 @@ export default function SendMoneyPage() {
           <AlertTitle>This account is {account.status.toLowerCase()}</AlertTitle>
           <AlertDescription>
             You can&apos;t send money from an account that isn&apos;t active.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // transaction-service now requires proof you own the sender account -
+  // the legacy "account number only" path has no token to present, so it
+  // can't call transfer at all. Better to say so here than let someone fill
+  // out the whole form and hit a 401 at the end.
+  if (!token) {
+    return (
+      <div className="mx-auto max-w-lg">
+        <Alert>
+          <LogIn className="size-4" />
+          <AlertTitle>Log in required</AlertTitle>
+          <AlertDescription className="space-y-3">
+            <p>
+              Sending money requires a password-authenticated session. This
+              account was accessed by account number alone, which has no
+              password to verify.
+            </p>
+            <Button asChild size="sm">
+              <Link href="/accounts">Go to Accounts</Link>
+            </Button>
           </AlertDescription>
         </Alert>
       </div>
