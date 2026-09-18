@@ -13,6 +13,9 @@ import com.example.accountservice.dto.LoginResponse;
 import com.example.accountservice.entity.Account;
 import com.example.accountservice.entity.AccountStatus;
 import com.example.accountservice.entity.AccountType;
+import com.example.accountservice.exception.BadRequestException;
+import com.example.accountservice.exception.ConflictException;
+import com.example.accountservice.exception.NotFoundException;
 import com.example.accountservice.exception.UnauthorizedException;
 import com.example.accountservice.repository.AccountRepository;
 
@@ -28,38 +31,12 @@ public class AccountService {
     private final TokenService tokenService;
     private static SecureRandom secureRandom = new SecureRandom();
 
-    // public AccountResponse createAccount(CreateAccountRequest request){
-    //     log.info("Creating account for: {}", request.getEmail());
-
-    //     if(accountRepository.existsByEmail(request.getEmail())){
-    //         throw new RuntimeException("Account already exists for email: "+ request.getEmail());
-    //     }
-
-    //     Account account = new Account();
-    //     account.setAccountHolderName(request.getAccountHolderName());
-    //     account.setEmail(request.getEmail());
-    //     account.setPhone(request.getPhone());
-    //     account.setAccountType(request.getAccountType());
-    //     account.setStatus(AccountStatus.ACTIVE);
-    //     account.setBalance(request.getInitialDeposit());
-    //     account.setAccountNumber(generateAccountNumber());
-    //     account.setDailyTransactionLimit(
-    //         request.getAccountType() == AccountType.SAVINGS
-    //         ? new BigDecimal("1000000")
-    //         : new BigDecimal("5000000")
-    //     );
-
-    //     Account savedAccount = accountRepository.save(account);
-    //     log.info("Account created: {}", savedAccount.getAccountNumber());
-    //     return mapToResponse(savedAccount);
-    // }
-
     public AccountResponse createAccount(CreateAccountRequest request){
     log.info("Creating account for: {}", request.getEmail());
 
     log.info("Checking existing email...");
     if(accountRepository.existsByEmail(request.getEmail())){
-        throw new RuntimeException(
+        throw new ConflictException(
             "Account already exists for email: " + request.getEmail()
         );
     }
@@ -115,7 +92,7 @@ public class AccountService {
     //get account by account number
     public AccountResponse getAccount(String accountNumber){
         Account account = accountRepository.findByAccountNumber(accountNumber)
-        .orElseThrow(() -> new RuntimeException("Account Not Found"));
+        .orElseThrow(() -> new NotFoundException("Account not found: " + accountNumber));
 
         return mapToResponse(account);
     }
@@ -123,7 +100,7 @@ public class AccountService {
     // get account balance
     public BigDecimal getBalance(String accountNumber){
         Account account = accountRepository.findByAccountNumber(accountNumber)
-        .orElseThrow(() -> new RuntimeException("Account Not Found"));
+        .orElseThrow(() -> new NotFoundException("Account not found: " + accountNumber));
 
         return account.getBalance();
     }
@@ -133,7 +110,7 @@ public class AccountService {
     public void blockAccount(String accountNumber){
         log.info("Blocking account: {}", accountNumber);
         Account account = accountRepository.findByAccountNumber(accountNumber)
-        .orElseThrow(() -> new RuntimeException("Account Not Found"));
+        .orElseThrow(() -> new NotFoundException("Account not found: " + accountNumber));
         account.setStatus(AccountStatus.BLOCKED);
         accountRepository.save(account);
         log.info("Account blocked: {}", accountNumber);
@@ -144,14 +121,14 @@ public class AccountService {
         log.info("Deducting balance {} from account: {}", amount, accountNumber);
 
         Account account =  accountRepository.findByAccountNumber(accountNumber)
-        .orElseThrow(() -> new RuntimeException("Account Not Found"));
+        .orElseThrow(() -> new NotFoundException("Account not found: " + accountNumber));
 
         if(account.getStatus() != AccountStatus.ACTIVE){
-            throw new RuntimeException("Account not active" + accountNumber);
+            throw new BadRequestException("Account " + accountNumber + " is not active");
         }
 
         if(account.getBalance().compareTo(amount) < 0){
-            throw new RuntimeException("Insufficient funds for account" + accountNumber);
+            throw new BadRequestException("Insufficient funds for account " + accountNumber);
         }
 
         account.setBalance(account.getBalance().subtract(amount));
@@ -160,12 +137,13 @@ public class AccountService {
         log.info("Balance updated. New Balance: {}", account.getBalance());
     }
 
-    // credit balance -> called by transaction service via kafka
+    // credit balance -> called by transaction service via kafka, or by the
+    // SAGA compensation path when refunding a sender
     public void creditBalance(String accountNumber, BigDecimal amount){
         log.info("Crediting {} to account: {}", amount, accountNumber);
 
         Account account = accountRepository.findByAccountNumber(accountNumber)
-            .orElseThrow(() -> new RuntimeException("Account Not Found"));
+            .orElseThrow(() -> new NotFoundException("Account not found: " + accountNumber));
 
         account.setBalance(account.getBalance().add(amount));
         accountRepository.save(account);
