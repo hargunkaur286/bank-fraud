@@ -20,11 +20,13 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 server:
   port: 8083
-#Razorpay configuration
+#Razorpay configuration - real values come from RAZORPAY_KEY_ID /
+# RAZORPAY_KEY_SECRET (set in docker-compose.yml from a local .env file,
+# never committed - see .env.example at the repo root).
 razorpay:
   key:
-    id: REDACTED_RAZORPAY_KEY_ID
-    secret: REDACTED_RAZORPAY_KEY_SECRET
+    id: ${RAZORPAY_KEY_ID:}
+    secret: ${RAZORPAY_KEY_SECRET:}
   webhook-secret:
 management:
   endpoints:
